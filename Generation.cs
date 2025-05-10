@@ -11,6 +11,8 @@ using msi_GA.GA;
 using System.Collections;
 using System.Security;
 using System.Numerics;
+using System.ComponentModel.Design;
+using System.Security.Cryptography.X509Certificates;
 
 namespace msi_GA.GA
 {
@@ -26,14 +28,24 @@ namespace msi_GA.GA
         public int ID { get; set; }
         public int MaxFitness { get; set; }
         public List<SerializedGen> Individuals { get; set; }
-    }
+    
 
 
+
+        }
+
+
+
+
+
+    
     internal class Generation : Gen
     {
 
-        private List<Gen> _generations = new List<Gen>();
+        private List<Gen> _generations = new List<Gen>(); // ??
         private object randLock = new object();
+
+
 
         private int GenerationLength = 24;
         public int ParentsCount = 2;
@@ -50,7 +62,9 @@ namespace msi_GA.GA
         public int MaxWorkerDispersionScore = 0;
         public int MaxShiftsScore = 0;
         public int MaxEachWorkerTypePerShift = 0;
-
+        public double Variation = 0.0;
+        public double Mean = 0.0;
+        public double StandardDeviation = 0.0;
 
         public double LowCellingFintessPerWorker = 0;
         public double MiddleCellingFintessPerWorker = 0;
@@ -69,6 +83,9 @@ namespace msi_GA.GA
         public int EtylistChangeInterval = 50;
         public int MutationChangeInterval = 10;
 
+
+
+      
         public void WyswietlOpcje()
         {
             Console.WriteLine($"EtylistRate : {ElitistRate}");
@@ -125,15 +142,33 @@ namespace msi_GA.GA
             MiddleCellingFintessPerWorker = MaxFitness / 2;
            
             SortGenerations();
-            SaveGenerationsToJson("generacje.json");
+       
             ID++;
 
         }
 
     
+        public void CalculateVarianceAndMean(Generation generation)
+        {
+            double sum = 0;
+       
+            foreach(var gen in generation._generations)
+            {
+                sum += gen.Fitness ;
+            }
 
+            Mean = sum / GenerationLength;
 
-       public void AdaptiveNextGenerations(int amount)
+            foreach (var gen in generation._generations)
+            {
+                Variation += Math.Pow(gen.Fitness - Mean, 2);
+            }
+
+            StandardDeviation = Math.Sqrt(Variation / GenerationLength);
+
+        }
+
+        public void AdaptiveNextGenerations(int amount)
         {
 
             for(int i = 0 ; i < amount; i++)
@@ -250,7 +285,7 @@ namespace msi_GA.GA
             CopyGeneration(newGenerations);
             
             SortGenerations();
-            SaveGenerationsToJson("generacje.json");
+            
             Console.WriteLine(ID);
             ID++;
             
@@ -282,13 +317,13 @@ namespace msi_GA.GA
         public  void SortGenerations()
         {
             _generations = _generations.OrderByDescending(x => x.Fitness).ToList();
+
+            CalculateVarianceAndMean(this);
         }
 
         public void PrintGenerations()
         {
-            Console.WriteLine($"max fitness: {MaxFitness} , max HoursScore : {MaxHoursScore}, max ShiftBreakScore : {MaxShiftBreakScore}, max Worker Dispersion Score: {MaxWorkerDispersionScore}, Max shifs Score : {MaxShiftsScore} , Max eachworkerTypeperShift Score {MaxEachWorkerTypePerShift}");
-
-
+            
 
             foreach (var gen in _generations)
             {
@@ -319,6 +354,20 @@ namespace msi_GA.GA
             Console.WriteLine($"Etylist Rate: {ElitistRate}");
             Console.WriteLine($"Mutation Rate: {MutationRate}");
             Console.WriteLine($"Parents : {ParentsCount}");
+
+            Console.WriteLine($"Max fitness: {MaxFitness}");
+            Console.WriteLine($"Max HoursScore: {MaxHoursScore}");
+            Console.WriteLine($"Max ShiftBreakScore: {MaxShiftBreakScore}");
+            Console.WriteLine($"Max Worker Dispersion Score: {MaxWorkerDispersionScore}");
+            Console.WriteLine($"Max Shifts Score: {MaxShiftsScore}");
+            Console.WriteLine($"Max EachWorkerTypePerShift Score: {MaxEachWorkerTypePerShift}");
+
+            Console.WriteLine($"Mean : {Mean:F2}");
+            Console.WriteLine($"Variance : {Variation:F2}");
+            Console.WriteLine($"Standard Deviation : {StandardDeviation:F2}");
+
+
+
 
         }
 
@@ -419,6 +468,8 @@ namespace msi_GA.GA
 
 
 
+
+            
             List<Gen> children = new List<Gen>();
             for (int i = 0; i < ParentsCount; i++)
             {
@@ -450,6 +501,26 @@ namespace msi_GA.GA
 
 
         }
+
+
+        /// ???
+        public void HeuristicCrossover()
+        {
+            int parent1 = random.Next(0, ElitistRate);
+            int parent2 = random.Next(0, ElitistRate);
+            Gen child = new Gen();
+
+
+  
+
+        }
+
+
+
+
+
+
+
 
 
 
@@ -737,103 +808,7 @@ namespace msi_GA.GA
             }
         }
 
-        public void SaveGenerationsToJson(string filePath)
-        {
-            Dictionary<string, List<object>> generationsDict;
-
-            // Jeśli plik istnieje – wczytaj dane
-            if (File.Exists(filePath))
-            {
-                string existingJson = File.ReadAllText(filePath);
-
-                generationsDict = JsonSerializer.Deserialize<Dictionary<string, List<object>>>(existingJson)
-                                  ?? new Dictionary<string, List<object>>();
-            }
-            else
-            {
-                generationsDict = new Dictionary<string, List<object>>();
-            }
-
-            // Tworzenie danych nowej generacji
-            var generationData = new List<object>();
-            for (int i = 0; i < GenerationLength; i++)
-            {
-                var genData = new
-                {
-                    Fitness = _generations[i].Fitness,
-                    HoursScore = _generations[i].HoursScore,
-                    ShiftBreakScore = _generations[i].ShiftBreakScore,
-                    WorkerDispersionScore = _generations[i].WorkerDispersionScore,
-                    ShiftsScore = _generations[i].MaxShiftScore,
-                    TypeOfWorkerPerShift = _generations[i].TypeOfWorkerPerShift,
-                };
-                generationData.Add(genData);
-            }
-
-            // Dodajemy nową generację (np. "Generation5")
-            generationsDict[$"Generation{ID}"] = generationData;
-
-            // Serializacja i zapis do pliku
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true
-            };
-            string jsonString = JsonSerializer.Serialize(generationsDict, options);
-            File.WriteAllText(filePath, jsonString);
-        }
-
-
-
-        public void SaveGenerationsToJson_0(string filePath)
-        {
-            var generationsDict = new Dictionary<string, object>();
-
-            // Sprawdzenie, czy plik już istnieje
-            if (File.Exists(filePath))
-            {
-                // Odczytanie istniejących danych
-                string existingJson = File.ReadAllText(filePath);
-                generationsDict = JsonSerializer.Deserialize<Dictionary<string, object>>(existingJson);
-            }
-
-            // Dodanie MaxFitness do słownika (będzie to widoczne w każdej generacji)
-            generationsDict["MaxFitness"] = MaxFitness;
-
-            // Tworzymy dane dla tej generacji, z identyfikatorem ID
-            var generationData = new List<object>();
-
-            // Dla każdej generacji tworzysz nowy wpis w słowniku
-            for (int i = 0; i < GenerationLength; i++)
-            {
-                var genData = new
-                {
-                    Fitness = _generations[i].Fitness,
-                    Schedule = _generations[i].Schedule // Zakładając, że to jest dwuwymiarowa tablica
-                };
-                generationData.Add(genData);
-            }
-
-            // Dodanie danych generacji z ID jako klucz
-            generationsDict[$"Generation{ID}"] = generationData;
-
-            // Serializowanie do JSON
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true // Formatowanie JSON
-            };
-
-            string jsonString = JsonSerializer.Serialize(generationsDict, options);
-
-            // Zapisanie danych zaktualizowanych do pliku JSON
-            File.WriteAllText(filePath, jsonString);
-
-            // Console.WriteLine($"Zapisano generacje do pliku: {filePath}");
-        }
-
-
-      
-
-
+    
 
 
 

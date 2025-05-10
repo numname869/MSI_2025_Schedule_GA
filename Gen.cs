@@ -25,12 +25,12 @@ namespace msi_GA.GA
 
 
         public int[][] _schedule;
-        public int _fitness;
-        public int _HoursScore;
-        public int _ShiftBreakScore;
-        public int _workerDispersionScore;
+        private int _fitness;
+        private int _HoursScore;
+        private int _ShiftBreakScore;
+        private int _workerDispersionScore;
         public int _maxShiftsScore;
-        public int _TypeOfWorkerPerShift;
+        private int _TypeOfWorkerPerShift;
 
 
 
@@ -122,6 +122,7 @@ namespace msi_GA.GA
             _workerDispersionScore = WorkerDispersionGeneral(_schedule);
 
         }
+
 
 
         public int ShiftBreakScore
