@@ -37,15 +37,20 @@ namespace msi_GA.GA
                     generation.number,
                     generation.seriesnumber,
                     generation.ElitistRate,
-                    generation.MutationRate
-                    generation.GenerationLength
+                    generation.MutationRate,
+                    generation.BestParentsKept,
+                    generation.GenerationLength,
                 },
                 ListOfGens = generation._generations.Select(g => new
                 {
-                    Schedule = g._schedule,  // Zapisujemy postrzępioną tablicę
-                    Fitness = g.Fitness,      // Publiczne właściwości
+                    Schedule = g._schedule, 
+                    Fitness = g.Fitness,      
                     HoursScore = g.HoursScore
-                    // ... tylko to, co nie jest ignorowane
+                    ShiftBreakScore = g.ShiftBreakScore,
+                    WorkerDispersionScore = g.WorkerDispersionScore,
+                    MaxShiftScore = g.MaxShiftScore,
+                    TypeOfWorkerPerShift = g.TypeOfWorkerPerShift,
+                  
                 }).ToList(),
                 Statistics = new
                 {
