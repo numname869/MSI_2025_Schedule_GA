@@ -20,14 +20,14 @@ namespace msi_GA.GA
 
     public class Generation : Gen
     {
-        public static List<Worker> _workers = new List<Worker> { };
+        public static List<Worker> Workers = new List<Worker> { };
         int workers = 0;
         public List<Gen> _generations = new List<Gen>(); 
         private object randLock = new object();
 
 
 
-        private int GenerationLength = 24;
+        public int GenerationLength = 24;
         public int ParentsCount = 2;
         public int ElitistRate = 0;
         public int BestParentsKept = 0;
@@ -71,6 +71,8 @@ namespace msi_GA.GA
 
         private readonly SaveManagment _saveManagment;
 
+      
+
         public void WyswietlOpcje()
         {
             Console.WriteLine("------------------------------------------------------------------------");
@@ -101,15 +103,25 @@ namespace msi_GA.GA
         public Generation(bool IsConstantAware, string filePath ,SaveManagment saveManagment)
         : base()
         {
+            _saveManagment = saveManagment;
             filepathWorkers = filePath;
             LoadWorkersFromJson(filepathWorkers);
-            workers = _workers.Count;
+            workers = Workers.Count;
             GenerateFirstGeneration(IsConstantAware);
-            _saveManagment = saveManagment;
+            
         }
 
-        public static void LoadWorkersFromJson(string filePath)
+
+        public Generation()
         {
+           
+
+        }
+
+        public void LoadWorkersFromJson(string filePath)
+        {
+
+
             if (!File.Exists(filePath))
                 throw new FileNotFoundException("Plik z pracownikami nie istnieje");
 
@@ -119,22 +131,17 @@ namespace msi_GA.GA
                 PropertyNameCaseInsensitive = true
             };
 
-            _workers = JsonSerializer.Deserialize<List<Worker>>(json, options);
+            Workers = JsonSerializer.Deserialize<List<Worker>>(json, options);
         }
 
 
 
-      public int GetNewNumber()
+     
+
+
+        public void GenerateFirstGeneration(bool IsConstantAware = false)
         {
-
-
-            return _saveManagment.ReadManifest() + 1;
-        }
-
-
-        public void GenerateFirstGeneration(bool IsConstantAware = false, string filepath = "" )
-        {
-            number = GetNewNumber();
+            number = _saveManagment.ReadManifest() + 1;
 
 
             for (int i = 0; i < GenerationLength; i++)
@@ -159,6 +166,8 @@ namespace msi_GA.GA
             SortGenerations();
        
             seriesnumber++;
+
+            _saveManagment.UpdateManifest(number);
 
         }
 
@@ -189,7 +198,7 @@ namespace msi_GA.GA
             for(int i = 0 ; i < amount; i++)
             {
 
-                GenerateNextGeneration(CrossoverOption);
+                GenerateNextGeneration();
 
 
                 
@@ -252,12 +261,12 @@ namespace msi_GA.GA
 
 
 
-        public void GenerateNextGeneration(int option)
+        public void GenerateNextGeneration()
         {
             List<Gen> newGenerations = new List<Gen>();
            
            
-            CrossoverOption = option;
+           
             int ChildAmount = 0;
 
            
