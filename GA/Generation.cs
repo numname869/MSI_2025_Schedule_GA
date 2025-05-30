@@ -192,7 +192,7 @@ namespace msi_GA.GA
                     MR_before = MutationRate;
                     NeuralGuidedMutation(child);
                 }
-              else  if (HoursScoreMean < 0.8 && BetterHoursMutationEnabled)
+              if (HoursScoreMean < 0.8 && BetterHoursMutationEnabled)
                 {
                     MutateForBetterHours(child);
                 }
