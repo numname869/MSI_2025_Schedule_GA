@@ -74,7 +74,7 @@ namespace msi_GA.GA
                 {
                     generation.number,
                     generation.seriesnumber,
-                    generation.ElitistRate,
+                    generation.ReprodcutionRate,
                     generation.MutationRate,
                     generation.BestParentsKept,
                     generation.GenerationLength,
@@ -88,17 +88,10 @@ namespace msi_GA.GA
                     WorkerDispersionScore = g.WorkerDispersionScore,
                     MaxShiftScore = g.MaxShiftScore,
                     TypeOfWorkerPerShift = g.TypeOfWorkerPerShift,
+                    Preferences = g.PreferencesScore,
+                    Days = g.Days,
                 }).ToList(),
-                Statistics = new
-                {
-                    generation.MaxFitness,
-                    generation.MaxEachWorkerTypePerShift,
-                    generation.MaxFitnessPerWorker,
-                    generation.MaxHoursScore,
-                    generation.MaxShiftBreakScore,
-                    generation.Mean,
-                    generation.Variation
-                }
+              
             };
 
             string json = JsonConvert.SerializeObject(dataToSave, Formatting.Indented);
@@ -108,17 +101,12 @@ namespace msi_GA.GA
         public Generation LoadGeneration(int generationNumber, int seriesNumber)
         {
             string saveFolderPath = Path.Combine(_saveDirectory, "Saves", $"{generationNumber}Save", $"{generationNumber}_Generation_{seriesNumber}.json");
-            string WorkerPath = Path.Combine(_saveDirectory, "Saves", $"{generationNumber}Save", $"generation_{generationNumber}_workers");
+            string workerFilePath = Path.Combine(_saveDirectory, "Saves", $"{generationNumber}Save", $"generation_{generationNumber}_workers.json");
 
             if (!File.Exists(saveFolderPath))
-            {
                 throw new FileNotFoundException($"Generation file not found at {saveFolderPath}");
-            }
-
-
 
             string json = File.ReadAllText(saveFolderPath);
-            // Use anonymous type for deserialization
             var data = JsonConvert.DeserializeAnonymousType(json, new
             {
                 GenerationInfo = new
@@ -131,15 +119,17 @@ namespace msi_GA.GA
                     GenerationLength = 0,
                 },
                 ListOfGens = new[] { new
-            {
-                Schedule = new int[][]{ new int[]{0}} ,
-                Fitness = 0,
-                HoursScore = 0,
-                ShiftBreakScore = 0,
-                WorkerDispersionScore = 0,
-                MaxShiftScore = 0,
-                TypeOfWorkerPerShift = 0,
-            } }.ToList(),
+        {
+            Schedule = new int[][] { new int[] { 0 } },
+            Fitness = 0.0,
+            HoursScore = 0.0,
+            ShiftBreakScore = 0.0,
+            WorkerDispersionScore = 0.0,
+            MaxShiftScore = 0.0,
+            TypeOfWorkerPerShift = 0.0,
+            PreferencesScore = 0.0,
+            Days = 0,
+        } }.ToList(),
                 Statistics = new
                 {
                     MaxFitness = 0,
@@ -153,46 +143,84 @@ namespace msi_GA.GA
             });
 
             if (data == null)
-            {
                 throw new JsonException("Failed to deserialize generation data. The file may be empty or invalid.");
-            }
-            Generation generation = new Generation ()
+
+            Generation generation = new Generation()
             {
                 number = data.GenerationInfo.number,
                 seriesnumber = data.GenerationInfo.seriesnumber,
-                ElitistRate = data.GenerationInfo.ElitistRate,
+                ReprodcutionRate = data.GenerationInfo.ElitistRate,
                 MutationRate = data.GenerationInfo.MutationRate,
                 BestParentsKept = data.GenerationInfo.BestParentsKept,
                 GenerationLength = data.GenerationInfo.GenerationLength,
-                _generations = data.ListOfGens.Select(g => new Gen
+                _generations = data.ListOfGens.Select(g => new Gen()
                 {
-                    Schedule = g.Schedule,
+                    Schedule = null, 
                     Fitness = g.Fitness,
                     HoursScore = g.HoursScore,
                     ShiftBreakScore = g.ShiftBreakScore,
                     WorkerDispersionScore = g.WorkerDispersionScore,
                     MaxShiftScore = g.MaxShiftScore,
-                    TypeOfWorkerPerShift = g.TypeOfWorkerPerShift
+                    TypeOfWorkerPerShift = g.TypeOfWorkerPerShift,
+                    PreferencesScore = g.PreferencesScore,
+                    Days = g.Days,
                 }).ToList(),
-                MaxFitness = data.Statistics.MaxFitness,
-                MaxEachWorkerTypePerShift = data.Statistics.MaxEachWorkerTypePerShift,
-                MaxFitnessPerWorker = data.Statistics.MaxFitnessPerWorker,
-                MaxHoursScore = data.Statistics.MaxHoursScore,
-                MaxShiftBreakScore = data.Statistics.MaxShiftBreakScore,
-                Mean = data.Statistics.Mean,
-                Variation = data.Statistics.Variation
+               
             };
 
-            string workerFilePath = Path.Combine(_saveDirectory, "Saves", $"{generation.number}Save", $"generation_{generation.number}_workers.json");
+           
             generation.LoadWorkersFromJson(workerFilePath);
+
+            int workers = generation.workers; 
+            int days = generation._generations.Count > 0 ? generation._generations[0].Days : 0; 
+
+      
+            int[][] InitializeSchedule(int w, int d)
+            {
+                int[][] schedule = new int[w][];
+                for (int i = 0; i < w; i++)
+                {
+                    schedule[i] = new int[3 * d];
+                }
+                return schedule;
+            }
+
+          
+            int[][] DeepCopySchedule(int[][] source)
+            {
+                if (source == null) return null;
+                int[][] copy = new int[source.Length][];
+                for (int i = 0; i < source.Length; i++)
+                {
+                    copy[i] = new int[source[i].Length];
+                    Array.Copy(source[i], copy[i], source[i].Length);
+                }
+                return copy;
+            }
+
+         
+            for (int i = 0; i < generation._generations.Count; i++)
+            {
+                generation._generations[i].Schedule = InitializeSchedule(workers, days);
+                if (data.ListOfGens.Count > i && data.ListOfGens[i].Schedule != null)
+                {
+                    generation._generations[i].Schedule = DeepCopySchedule(data.ListOfGens[i].Schedule);
+                }
+            }
+
+    
+            if (generation._generations.Count > 0)
+            {
+                generation.Schedule = DeepCopySchedule(generation._generations[0].Schedule);
+            }
 
             return generation;
         }
 
 
 
-     
-       
+
+
 
         public void CreateEmptyManifest()
         {
@@ -265,4 +293,7 @@ namespace msi_GA.GA
     {
         public int LastCreatedFileId { get; set; }
     }
+
+ 
+
 }

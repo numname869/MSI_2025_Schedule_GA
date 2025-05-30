@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -20,126 +21,94 @@ namespace msi_GA.GA
     }
 
 
-    public class Gen : GeneticOperations
+    public class Gen : Operations
     {
 
-
+        
         public int[][] _schedule;
-        private int _fitness;
-        private int _HoursScore;
-        private int _ShiftBreakScore;
-        private int _workerDispersionScore;
-        public int _maxShiftsScore;
-        private int _TypeOfWorkerPerShift;
+        private double _fitness;
+        private double _HoursScore;
+        private double _ShiftBreakScore;
+        private double _workerDispersionScore;
+        public double _maxShiftsScore;
+        public double _preferenceScore;
+        private double _TypeOfWorkerPerShift;
+        private bool _validHardConstraints = false;
 
 
 
-        [JsonIgnore]
         public int days = 7;
-       
-
-        [JsonIgnore]
-        private static  List<Worker> _workers = new List<Worker>
-{
-    // Operators (20 workers)
-    new Worker( "Operator", 1),
-    new Worker( "Operator", 0),
-    new Worker("Operator", 2),
-    new Worker( "Operator", 2),
+        public int workers = 0;
 
 
 
-
-    // Dispatchers (15 workers)
-    new Worker( "Dispatcher", 2),
-  //  new Worker(8, "Dispatcher", 1),
-    new Worker("Dispatcher", 0),
-   new Worker( "Dispatcher", 3),
-   new Worker( "Dispatcher", 0),
-
-
-
-
-
-    // Engineers (10 workers)
-    new Worker( "Engineer", 0),
-    new Worker("Engineer", 2),
-    new Worker( "Engineer", 2),
-     new Worker( "Engineer", 3),
-        new Worker( "Engineer", 0),
-    new Worker("Engineer", 0),
-    new Worker( "Engineer", 2),
-     new Worker( "Engineer", 3),
-
-   // new Worker(15, "Engineer", 1),
-
-};
-        public static  List<Worker> WorkersList
-        {
-
-
-            get { return _workers; }
-           
-
-        }
+     
 
             Random random = new Random();
 
 
-        public Gen(bool IsconstantAware)
+
+        public Gen(bool IsconstantAware, int workers)
         {
             
-            _schedule = new int[_workers.Count][];
+            _schedule = new int[workers][];
   
-            for (int i = 0; i < _workers.Count; i++)
+            for (int i = 0; i < workers; i++)
             {
                 _schedule[i] = new int[3*days];
             }
 
             PickGeneration(IsconstantAware);
-            _fitness = CalculateFitness(_schedule);
+            _fitness = GetNormalizedFitness(_schedule);
+
             _HoursScore = HoursMeet(_schedule);
             _ShiftBreakScore = ShiftBreak(_schedule);
             _workerDispersionScore = WorkerDispersionGeneral(_schedule);
             _maxShiftsScore = MaxShifts(_schedule);
+            _preferenceScore = Preferences(_schedule); 
             _TypeOfWorkerPerShift = EachWorkerTypePerShifts(_schedule);
 
+
+
+            if (HoursScore >= 0.8 && ShiftBreakScore == 1 && MaxShiftScore == 1)
+            {
+                ValidHardConstraints = true;
+            }
+            else ValidHardConstraints = false;
+
         }
+
+
+      
+
         public Gen()
         {
-
-            _schedule = new int[_workers.Count][];
-
-            for (int i = 0; i < _workers.Count; i++)
-            {
-                _schedule[i] = new int[3 * days];
-            }
-
-            GenerateSchedule();
-            _fitness = CalculateFitness(_schedule);
-            _HoursScore = HoursMeet(_schedule);
-            _ShiftBreakScore = ShiftBreak(_schedule);
-            _workerDispersionScore = WorkerDispersionGeneral(_schedule);
-
+            
+           
         }
 
+       
 
-
-        public int ShiftBreakScore
+        public double PreferencesScore
+        {
+            get { return _preferenceScore; }
+            set { _preferenceScore = value; }
+        }
+        public double ShiftBreakScore
         {
             get { return _ShiftBreakScore; }
             set { _ShiftBreakScore = value; }
 
         }
 
-        public int WorkerDispersionScore
+        public double WorkerDispersionScore
         {
             get { return _workerDispersionScore; }
             set { _workerDispersionScore = value; }
         }
 
 
-        public int HoursScore
+        public double HoursScore
         {
             get { return _HoursScore; }
             set { _HoursScore = value; }
@@ -147,13 +116,13 @@ namespace msi_GA.GA
         }
 
      
-        public int MaxShiftScore
+        public double MaxShiftScore
         {
             get { return _maxShiftsScore; }
             set { _maxShiftsScore = value; }
         }
 
-        public int TypeOfWorkerPerShift
+        public double TypeOfWorkerPerShift
         {
             get { return _TypeOfWorkerPerShift; }
             set { _TypeOfWorkerPerShift = value; }
@@ -165,11 +134,8 @@ namespace msi_GA.GA
             set { days = value; }
         }
 
-        public int Workers
-        {
-            get { return _workers.Count; }
-        }
-        public int Fitness
+
+        public double Fitness
         {
             get { return _fitness; }
             set { _fitness = value; }
@@ -178,6 +144,7 @@ namespace msi_GA.GA
         public int[][] Schedule
         {
             get { return _schedule; }
+            set { _schedule = value; }
         }
 
 
@@ -192,7 +159,11 @@ namespace msi_GA.GA
             get { return days*3; }
         }
 
-        
+        public bool ValidHardConstraints
+        {
+            get { return _validHardConstraints; }
+            set { _validHardConstraints = value; }
+        }
         public void PickGeneration(bool generation)
         {
             if (generation)
@@ -231,6 +202,8 @@ namespace msi_GA.GA
 
         }
 
+
+        
         public void ConstantAwareGeneration()
         {
 
@@ -263,8 +236,48 @@ namespace msi_GA.GA
 
         }
 
+
+        public Gen Clone()
+        {
+            Gen clone = new Gen(this.workers); // Create new instance
+
+            // Deep copy the schedule array
+            clone._schedule = new int[this._schedule.Length][];
+            for (int i = 0; i < this._schedule.Length; i++)
+            {
+                clone._schedule[i] = new int[this._schedule[i].Length];
+                Array.Copy(this._schedule[i], clone._schedule[i], this._schedule[i].Length);
+            }
+
+            // Copy all other properties
+            clone.Fitness = this.Fitness;
+            clone.HoursScore = this.HoursScore;
+            clone.ShiftBreakScore = this.ShiftBreakScore;
+            clone.WorkerDispersionScore = this.WorkerDispersionScore;
+            clone.MaxShiftScore = this.MaxShiftScore;
+            clone.TypeOfWorkerPerShift = this.TypeOfWorkerPerShift;
+
+            return clone;
+        }
+
+        // Constructor for cloning
+        public Gen(int workers)
+        {
+            this.workers = workers;
+            // Initialize but don't fill schedule - we'll copy it
+            this._schedule = new int[workers][];
+            for (int i = 0; i < workers; i++)
+            {
+                this._schedule[i] = new int[ShiftsAmount];
+
+
+
+            }
     
 
+
+         
+        }
 
 
 
@@ -272,4 +285,7 @@ namespace msi_GA.GA
 
 
     }
+
+
+
 }
